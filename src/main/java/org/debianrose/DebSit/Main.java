@@ -10,9 +10,8 @@ import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerToggleSneakEvent;
 import cn.nukkit.level.Location;
-import cn.nukkit.math.Vector3;
 import cn.nukkit.plugin.PluginBase;
-import cn.nukkit.utils.Config;
+import cn.nukkit.scheduler.Task;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,20 +23,19 @@ public class Main extends PluginBase implements Listener {
 
     @Override
     public void onEnable() {
-        this.getServer().getPluginManager().registerEvents(this, this);
-        this.saveDefaultConfig();
-        this.getLogger().info("SitPlugin enabled - players can now sit on blocks!");
+        getServer().getPluginManager().registerEvents(this, this);
+        getLogger().info("SitPlugin enabled!");
     }
 
     @Override
     public void onDisable() {
         for (EntityArmorStand stand : sittingPlayers.values()) {
             if (stand != null) {
-                stand.close();
+                stand.kill();
             }
         }
         sittingPlayers.clear();
-        this.getLogger().info("SitPlugin disabled");
+        getLogger().info("SitPlugin disabled");
     }
 
     @EventHandler
@@ -48,7 +46,13 @@ public class Main extends PluginBase implements Listener {
         }
 
         if (player.getPitch() > 45) {
-            Block blockBelow = player.getLevel().getBlock(player.getLocation().subtract(0, 0.5, 0));
+            Location loc = player.getLocation();
+            Block blockBelow = player.getLevel().getBlock(
+                (int) loc.x, 
+                (int) (loc.y - 0.5), 
+                (int) loc.z
+            );
+            
             if (isSittable(blockBelow)) {
                 sitPlayer(player, blockBelow);
             }
@@ -60,48 +64,54 @@ public class Main extends PluginBase implements Listener {
     }
 
     private void sitPlayer(Player player, Block block) {
-        if (sittingPlayers.containsKey(player.getUniqueId()) || player.isInsideOfWater() || player.isInsideOfLava()) {
+        if (sittingPlayers.containsKey(player.getUniqueId())) {
             return;
         }
 
-        Location sitLocation = block.getLocation().add(0.5, getSitHeight(block), 0.5);
-        sitLocation.yaw = player.getYaw();
-        sitLocation.pitch = 0;
+        Location sitLocation = new Location(
+            block.x + 0.5,
+            block.y + getSitHeight(block),
+            block.z + 0.5,
+            player.getYaw(),
+            0,
+            player.getLevel()
+        );
 
         EntityArmorStand armorStand = new EntityArmorStand(sitLocation.getChunk(), 
-                Entity.getDefaultNBT(sitLocation));
-        armorStand.setMarker(true);
-        armorStand.setInvisible(true);
+            Entity.getDefaultNBT(sitLocation));
+        armorStand.setNameTag("");
         armorStand.setNameTagVisible(false);
         armorStand.spawnToAll();
         
         player.teleport(sitLocation);
-        player.ride(armorStand);
         sittingPlayers.put(player.getUniqueId(), armorStand);
         
-        this.getServer().getScheduler().scheduleDelayedRepeatingTask(this, () -> {
-            if (!player.isSneaking() || !player.isOnline() || player.getVehicle() == null) {
-                standUp(player);
+        // Schedule task to check if player should stand up
+        getServer().getScheduler().scheduleRepeatingTask(new Task() {
+            @Override
+            public void onRun(int currentTick) {
+                if (!player.isSneaking() || !player.isOnline()) {
+                    standUp(player);
+                    this.cancel();
+                }
             }
-        }, 20, 20);
+        }, 20);
     }
 
-    private float getSitHeight(Block block) {
+    private double getSitHeight(Block block) {
         if (block instanceof BlockSlab) {
-            return 0.25f;
+            return 0.25;
         } else if (block instanceof BlockStairs) {
-            return 0.5f;
+            return 0.5;
         }
-        return 0.5f;
+        return 0.5;
     }
 
     private void standUp(Player player) {
         EntityArmorStand armorStand = sittingPlayers.remove(player.getUniqueId());
         if (armorStand != null) {
-            player.dismount();
-            armorStand.close();
-            Location standLocation = player.getLocation().add(0, 0.3, 0);
-            player.teleport(standLocation);
+            armorStand.kill();
+            player.teleport(player.getLocation().add(0, 0.3, 0));
         }
     }
 }
