@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group 'com.debianrose'
+version '1.0.1.2'
+
+sourceCompatibility = 17
+targetCompatibility = 17
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://repo.opencollab.dev/maven-releases/'
+    }
+    maven {
+        url 'https://repo.opencollab.dev/maven-snapshots/'
+    }
+}
+
+dependencies {
+    compileOnly 'cn.nukkit:nukkit:1.0-SNAPSHOT'
+}
+
+shadowJar {
+    archiveClassifier.set('')
+    mergeServiceFiles()
+    manifest {
+        attributes 'Main-Class': 'com.debianrose.DebSit.Main'
+    }
+    archiveFileName = "debsit"
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
