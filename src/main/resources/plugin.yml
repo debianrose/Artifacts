@@ -1,5 +1,5 @@
-name: DebSit
-main: org.debianrose.DebSit.Main
+name: Artifact
+main: org.debianrose.TimeA.Main
 version: 1.0.0
 api: ["1.0.0"]
 author: debianrose
